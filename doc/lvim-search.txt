@@ -1,0 +1,501 @@
+*lvim-search.txt*                                 Search that tells you where you are
+
+==============================================================================
+CONTENTS                                                   *lvim-search-contents*
+
+    1. Introduction ........................... |lvim-search-introduction|
+    2. Requirements ........................... |lvim-search-requirements|
+    3. Installation ........................... |lvim-search-installation|
+    4. Configuration .......................... |lvim-search-configuration|
+       4.1 Behaviour .......................... |lvim-search-config-behaviour|
+       4.2 Scanning ........................... |lvim-search-config-scan|
+       4.2a The typing preview ................ |lvim-search-config-preview|
+       4.3 The lens ........................... |lvim-search-config-lens|
+       4.4 The nearest match .................. |lvim-search-config-nearest|
+       4.5 Export ............................. |lvim-search-config-export|
+       4.6 Colours ............................ |lvim-search-config-colours|
+       4.7 Windows and off-screen ............. |lvim-search-config-windows|
+    5. Commands ............................... |lvim-search-commands|
+    6. API .................................... |lvim-search-api|
+    7. Statusline ............................. |lvim-search-statusline|
+    8. Highlight groups ....................... |lvim-search-highlights|
+    9. How it works ........................... |lvim-search-internals|
+   10. Health ................................. |lvim-search-health|
+
+==============================================================================
+1. INTRODUCTION                                        *lvim-search-introduction*
+
+Neovim highlights every match of a search identically. A screen full of yellow
+does not say which match the cursor is on, how many there are, or how far away
+the next one is.
+
+lvim-search puts the COMMAND that reaches each visible match beside it, and
+paints the nearest match in its own colour.
+
+It takes none of your keys. Not `n`, `N`, `*`, `#`, `/` or `?`. It watches
+|v:hlsearch| from a decoration provider, which is the one signal that sees
+every way a search can begin or end, including |:nohlsearch|, <Esc> out of an
+'incsearch', and a pattern set by |:s|.
+>
+    alpha foo beta                                             [3N]
+    nothing at all here
+    gamma foo delta foo                                        [2N]
+    plain line          <- the cursor is here
+    epsilon foo zeta                                         [n 4/5]
+    another foo line                                           [2n]
+<
+`[3N]` means: type `3N` and you are there. Counting the presses is exactly the
+arithmetic a counter should do for you, so an absolute index is not what the
+lenses show.
+
+Two independent facts, kept independent: the ARROW says where the match lies
+in the buffer, the KEY says what to press. They are not the same thing —
+after a `?` search |v:searchforward| is 0 and `n` travels backwards, so an
+arrow that mirrored the key would point the wrong way half the time.
+
+The nearest match adds `4/5` — the one place an absolute reading answers a
+question the command does not.
+
+==============================================================================
+2. REQUIREMENTS                                        *lvim-search-requirements*
+
+    • Neovim 0.10 or newer (|matchbufline()|, decoration providers)
+    • lvim-utils
+    • 'hlsearch' must be on. Without it |v:hlsearch| never becomes 1 and
+      nothing is ever shown; |:checkhealth| reports this as an error.
+
+==============================================================================
+3. INSTALLATION                                        *lvim-search-installation*
+
+With lvim-installer: >lua
+    require("lvim-installer").install({
+        "lvim-tech/lvim-utils",
+        "lvim-tech/lvim-search",
+    })
+<
+Or with Neovim's native |vim.pack|: >lua
+    vim.pack.add({
+        "https://github.com/lvim-tech/lvim-utils",
+        "https://github.com/lvim-tech/lvim-search",
+    })
+<
+Then: >lua
+    require("lvim-search").setup({})
+<
+==============================================================================
+4. CONFIGURATION                                      *lvim-search-configuration*
+
+`setup()` merges into the live config; anything left out keeps its default.
+
+------------------------------------------------------------------------------
+4.1 BEHAVIOUR                                     *lvim-search-config-behaviour*
+
+`enabled`                                              boolean, default `true`
+    Master switch. Nothing is scanned and nothing is drawn while it is off.
+
+`auto_start`                                           boolean, default `true`
+    Appear and disappear with |v:hlsearch|, taking no mappings. With it off,
+    the lenses only show after |:LvimSearchToggle|.
+
+`calm_down`                                           boolean, default `false`
+    Clear the search as soon as the cursor leaves the match it was on. Off by
+    default: ending someone's search because their cursor wandered is a strong
+    opinion, and one they should choose rather than discover.
+
+`nearest_only`                                        boolean, default `false`
+    Draw only the nearest lens, not one per visible match.
+
+`throttle`                                             number, default `120`
+    Milliseconds between cursor-driven repaints. The FIRST move of a burst
+    repaints immediately; only the storm behind it is thinned.
+
+`ignore.buftype`   string[], default `{ "terminal", "prompt", "quickfix" }`
+`ignore.filetype`                                    string[], default `{}`
+    Buffers that are never decorated.
+
+------------------------------------------------------------------------------
+4.2 SCANNING                                           *lvim-search-config-scan*
+
+`scan.max_matches`                                  number, default `100000`
+    The scan stops here. Above it the plugin DEGRADES rather than going
+    silent — see `scan.degrade`.
+
+`scan.degrade`                                       string, default `"count"`
+    What a capped buffer still shows. `"count"` keeps the nearest counter,
+    `"off"` shows nothing.
+
+`scan.multiline`                                       boolean, default `true`
+    Allow the slower bounded walk for patterns that can cross lines (`\n`,
+    `\_.`). |matchbufline()| cannot find those.
+
+`scan.multiline_timeout`                                number, default `100`
+    Milliseconds that walk may take, per scan.
+
+`scan.cache_buffers`                                      number, default `8`
+    How many buffers keep their match list (LRU).
+
+------------------------------------------------------------------------------
+4.2a THE TYPING PREVIEW                             *lvim-search-config-preview*
+
+The lenses appear while the pattern is still being TYPED, counting what is on
+the command line. The numbers are the ones you will have after <CR> — they are
+measured from where the cursor was when you opened the command line, and shaped
+as the position the search will leave you in, so committing moves nothing.
+
+`preview.enabled`                                      boolean, default `true`
+    Count the pattern while it is being typed.
+
+`preview.min_chars`                                       number, default `2`
+    Do not scan anything shorter. One character matches most of a large file
+    and the answer changes completely with the next keystroke.
+
+`preview.redraw`                                       boolean, default `true`
+    Push the screen update from the cmdline autocmd. Without it nothing
+    appears until <CR>: Neovim's own 'incsearch' redraw has already happened
+    by the time the preview is painted.
+
+`preview.budget`                                         number, default `50`
+    Milliseconds a preview scan may take before the pattern is judged too
+    broad to preview. It then steps aside until the pattern is longer — which
+    is cheaper, so this self-corrects as you type. Measured on this machine: a
+    selective pattern over 200000 lines scans in ~42ms, a single common letter
+    in ~770ms; the cost follows the number of MATCHES, not the size of the
+    file.
+
+Note: a pattern PASTED into the command line may not show until the next
+keystroke or <CR>. `:redraw` is skipped while typeahead is pending, and the
+main loop — where a deferred paint would run — does not run while the command
+line waits for input. Nothing wrong is shown; the preview simply waits.
+
+------------------------------------------------------------------------------
+4.3 THE LENS                                           *lvim-search-config-lens*
+
+`lens.priority`                                         number, default `100`
+    Extmark priority for the lens text.
+
+`lens.hl_mode`                                     string, default `"combine"`
+    `"combine"` keeps the buffer's own syntax visible under the lens.
+
+`lens.gap`                                               string, default `" "`
+    Spacer between the line's text and the lens.
+
+`lens.nearest_format`                    string, default `"{current}/{total}"`
+    The nearest lens body.
+
+    Every format string in this plugin uses NAMED placeholders — `{current}`,
+    `{glyph}`, `{arrow}` and so on — rather than `%s`/`%d`. Lua has no
+    positional specifiers, so a printf template fixes the ORDER of its values
+    as firmly as their types: putting the number before the icon would mean
+    editing code. A named placeholder carries its own meaning, so the order is
+    yours to change by typing. An unknown name is drawn verbatim rather than
+    swallowed, so a typo is visible; |:checkhealth| names it.
+
+`lens.other_format`                          string, default `"{indicator}"`
+    Every other lens body: its indicator (`2n`, `3N`).
+
+`lens.wrap`                        table, default `{ left = " ", right = " " }`
+    Around a lens. Both `""` for bare text.
+
+`lens.indicator.enabled`                               boolean, default `true`
+    Show how to REACH a match, not only where it sits in the order.
+
+`lens.indicator.up`                                       string, default nf-fa-arrow_up
+`lens.indicator.down`                                     string, default nf-fa-arrow_down
+    The arrow for a match above the cursor, and below. Nerd Font glyphs, one
+    cell each. Set both to `""` to drop the arrows and keep the command.
+
+`lens.indicator.forward`                                 string, default `"n"`
+`lens.indicator.backward`                                string, default `"N"`
+    The key that travels DOWN the buffer, and up. Which of the two is used
+    follows |v:searchforward| automatically: after a `?` search they swap, and
+    so does the indicator.
+
+`lens.indicator.format`                string, default `"{arrow}{count}{key}"`
+    `{arrow}`, `{count}`, `{key}` — in any order. The count is `""` when a
+    single press does it, so the result reads as the exact command to type:
+    `2n`, `N`.
+
+`lens.overflow`                                string, default `"right_align"`
+    Where a lens goes when the line is too long for it to sit after the text:
+    `"right_align"`, `"eol_right_align"` or `"hide"`. An `eol` lens that runs
+    past the window edge is not clipped — it disappears entirely — so this is
+    applied to every lens, not just the nearest.
+
+`lens.format`                                        function, default `nil`
+    Full override. Return extmark chunks, or nil to fall back to the built-in
+    body for that match. Its answer is final. >lua
+        format = function(ctx)
+            -- ctx = { buf, index, current, total, nearest, forward, rel,
+            --         lnum, col }
+            if not ctx.nearest then
+                return nil -- keep the default for the others
+            end
+            return { { " ", "Normal" }, { ("%d of %d"):format(ctx.current, ctx.total), "LvimSearchLensNearest" } }
+        end
+<
+------------------------------------------------------------------------------
+4.4 THE NEAREST MATCH                               *lvim-search-config-nearest*
+
+`nearest_hl.enabled`                                   boolean, default `true`
+    Paint the nearest match itself, not only its lens.
+
+`nearest_hl.only_off_match`                            boolean, default `true`
+    Paint it only when the cursor is NOT on it. Neovim's own |hl-CurSearch|
+    already owns that case, and two highlights arguing over it is worse than
+    one.
+
+`nearest_hl.priority`                                     number, default `20`
+    On the |matchadd()| scale, NOT the extmark one: 'hlsearch' sits at 0 there
+    and other matches default to 10, so anything above 10 wins both.
+
+------------------------------------------------------------------------------
+4.5 EXPORT                                           *lvim-search-config-export*
+
+`qf.title`                             string, default `"Search ➤ {pattern}"`
+    Title of the exported list.
+
+`qf.title_scoped`      string, default `"Search ➤ {pattern} ({buffers} buffers)"`
+    …and when the export swept several buffers.
+    A sweep says how many it actually read, so a short list is never mistaken
+    for "that is all there is".
+
+`on_list`                                             function, default `nil`
+    Where an export goes instead of the |quickfix| list. The same shape
+    Neovim's own LSP handlers use, so a picker that already accepts `on_list`
+    accepts this one unchanged: >lua
+        on_list = function(arg)
+            -- arg = { items = …, title = …,
+            --         context = { pattern = …, capped = … } }
+        end
+<
+`counter.publish`                                      boolean, default `true`
+    Fire `User LvimSearchStatus` when the counter changes — and only then.
+
+------------------------------------------------------------------------------
+4.6 COLOURS                                         *lvim-search-config-colours*
+
+Every entry names a palette COLOUR (an lvim-utils.colors key), never a hex
+literal, so the groups track the theme. `tint` is the blend toward the
+background. >lua
+    highlights = {
+        lens = { accent = "yellow", tint = 0.2 },
+        lens_nearest = { accent = "blue", tint = 0.4, bold = true },
+        nearest_match = { accent = "orange", tint = 0.4 },
+        -- Its own accent inside the nearest lens, so the counts read as a
+        -- different fact from the counter beside them. `bg = false` is also
+        -- accepted on any of these, and paints the accent as a FOREGROUND
+        -- only, with no tinted cell behind it.
+        remaining = { accent = "yellow", tint = 0.4 },
+    }
+<
+------------------------------------------------------------------------------
+4.7 WINDOWS AND OFF-SCREEN                           *lvim-search-config-windows*
+
+`windows`                                        string, default `"visible"`
+    `"visible"` decorates every window in the tab page, so a split does not go
+    unlabelled until you focus it; each is counted from ITS OWN cursor.
+    `"current"` decorates only the focused window.
+
+    A buffer shown in TWO windows is counted for the window you are in. Lens
+    extmarks live in the buffer, so one buffer cannot carry two different sets
+    of counters — and the honest tie-break is the window the reader is
+    actually in, rather than whichever was painted last.
+
+`nearest_by`                                      string, default `"buffer"`
+    How "nearest" is measured. `"buffer"` counts buffer lines: free, and what
+    the plugin does by default. `"screen"` counts the rows you can actually
+    see, via |nvim_win_text_height()| — exact about folds and wrapping, at one
+    call per comparison. They differ only when a fold or a wrapped line sits
+    between the two candidate matches; measured, ten rows spanning a six-line
+    fold report seven, and six wrapped rows report eight.
+
+`remaining.enabled`                                    boolean, default `true`
+    Say, in the NEAREST lens, how many matches remain in each direction:
+    `[N 54/57]  [53]  [3]` is fifty-three behind the cursor and three
+    ahead.
+
+`remaining.from`                                  string, default `"cursor"`
+    What the counts are measured from. `"cursor"` counts how many are left in
+    that direction — what an arrow beside a counter promises, and what `x/y`
+    already implies. `"window"` counts how many are not on screen, which is
+    not derivable from anything else but falls to zero while matches are
+    plainly visible further down, because they have not left the screen yet.
+
+`remaining.above`                            string, nf-fa-angle_double_up
+`remaining.below`                            string, nf-fa-angle_double_down
+    The glyphs. Deliberately not the plain arrows the indicator uses: those
+    would put two identical arrows side by side meaning different things,
+    while a double angle reads as "and more, that way". Either `""` to drop
+    that side.
+
+`remaining.format`                                     table of two templates
+    The body of each side, separately: `{glyph}` and `{count}` in whichever
+    order you like, and not necessarily the same order on both. The default
+    mirrors the pair around the separator, so both icons sit on the OUTSIDE —
+    icon count `·` count icon: >lua
+        format = { above = "{glyph}{count}", below = "{count}{glyph}" }
+<
+
+`remaining.wrap`                   table, default `{ left = " ", right = " " }`
+    Around the PAIR, exactly like `lens.wrap`; both `""` for bare text.
+
+`remaining.sep`                                       string, default `" • "`
+    BETWEEN the two counts, when both are shown. Its own option because the
+    wrap cannot express it: applied per side, the first side's right padding
+    would meet the second's left padding and the two values would sit twice as
+    far apart as either edge of the box.
+
+==============================================================================
+5. COMMANDS                                                *lvim-search-commands*
+
+                                                            *:LvimSearchToggle*
+:LvimSearchToggle       Show or hide the lenses without changing the search.
+
+                                                           *:LvimSearchRefresh*
+:LvimSearchRefresh      Repaint now, ignoring the throttle.
+
+                                                            *:LvimSearchExport*
+:LvimSearchExport [scope]
+                        Send every match of the current search to the
+                        |quickfix| list, or to `on_list` when one is set.
+                        The scope is one of:
+                            buffer  the current buffer (the default)
+                            all     every loaded, LISTED buffer
+                            args    the |argument-list|
+                        Only loaded buffers are read: loading files behind
+                        your back to search them is a side effect you did not
+                        ask for. What is skipped is reported, never silently
+                        dropped.
+
+==============================================================================
+6. API                                                          *lvim-search-api*
+
+>lua
+    local search = require("lvim-search")
+
+    search.setup(opts)  -- merge options and start listening
+    search.start()      -- begin keeping the lenses current
+    search.stop()       -- stop, leaving nothing behind
+    search.toggle()
+    search.refresh()    -- repaint now
+    search.export(opts) -- {scope = "buffer"|"all"|"args", buf = n}
+    search.preview(pat) -- count a pattern without searching for it
+    search.status()     -- the counter, or nil
+    search.state        -- "IDLE" or "ACTIVE"
+<
+                                                             *lvim-search-status*
+`status()` returns nil when nothing is counted, otherwise: >lua
+    {
+        pattern  = "foo",   -- what is being counted
+        current  = 3,       -- 1-based index of the nearest match
+        total    = 12,
+        capped   = false,   -- the scan stopped at scan.max_matches
+        on_match = true,    -- the cursor is inside the nearest match
+        forward  = true,    -- `n` moves towards higher indices
+        preview  = false,   -- true while the pattern is still being typed,
+                            -- so a statusline can mark it provisional
+    }
+<
+==============================================================================
+7. STATUSLINE                                            *lvim-search-statusline*
+
+Poll it: >lua
+    local function search_count()
+        local s = require("lvim-search").status()
+        return s and ("%d/%d"):format(s.current, s.total) or ""
+    end
+<
+Or listen, and repaint only when it changes: >lua
+    vim.api.nvim_create_autocmd("User", {
+        pattern = "LvimSearchStatus",
+        callback = function(ev)
+            vim.g.search_count = ev.data.total
+                and ("%d/%d"):format(ev.data.current, ev.data.total)
+                or ""
+            vim.cmd("redrawstatus")
+        end,
+    })
+<
+==============================================================================
+8. HIGHLIGHT GROUPS                                      *lvim-search-highlights*
+
+                                                              *hl-LvimSearchLens*
+LvimSearchLens          An ordinary lens.
+
+                                                       *hl-LvimSearchLensNearest*
+LvimSearchLensNearest   The lens of the nearest match.
+
+                                                           *hl-LvimSearchNearest*
+LvimSearchNearest       The nearest match itself, painted above `Search`.
+
+                                                         *hl-LvimSearchRemaining*
+LvimSearchRemaining     The counts of matches left in each direction.
+
+All four are derived from the lvim-utils palette and re-derived on a
+colorscheme change. Override them through `highlights` in `setup()` rather
+than with |:highlight|, so they keep tracking the theme.
+
+==============================================================================
+9. HOW IT WORKS                                            *lvim-search-internals*
+
+                                                    *lvim-search-why-no-mappings*
+The plugin learns that a search is highlighted the way the screen does:
+|v:hlsearch|, read from a decoration provider's `on_start`, which Neovim calls
+once per redraw cycle. That is the only seam that sees every way a search can
+begin or end, and it costs one integer read per redraw. Wrapping `n`, `N`, `*`
+and `/` instead would mean owning their behaviour forever — counts, registers,
+operator-pending, folds, and every other plugin that also wanted `n`.
+
+The provider is a SENSOR, not a renderer: its callback runs mid-redraw, where
+setting extmarks is not allowed, so it only notices the transition and hands
+the paint to |vim.schedule()|.
+
+                                                        *lvim-search-why-scanned*
+|searchcount()| answers "how many" and refuses to say where, so it cannot
+drive a per-match decoration. |matchbufline()| runs Vim's own regex engine over
+the buffer in C and returns every match with its line and byte index, without
+moving the cursor and without touching the search register. Its one limit is
+that it cannot match across lines, so a pattern containing `\n` or `\_` is
+routed to a bounded |searchpos()| walk instead — slower, correct, and only for
+the patterns that need it.
+
+A scan is cached against the buffer's |b:changedtick|, the pattern, and
+'ignorecase' / 'smartcase' — everything that can change its answer.
+
+                                                     *lvim-search-why-match-layer*
+The nearest match is painted with |matchaddpos()| rather than an extmark.
+Neovim draws 'hlsearch' above the whole extmark layer: an extmark at priority
+5000 over a highlighted match still shows `Search`, because search highlighting
+is not on the extmark priority scale at all. The layer it IS on is the one
+|matchadd()| writes to, where 'hlsearch' has priority zero.
+
+                                                     *lvim-search-why-a-command*
+A lens is an INSTRUCTION, not a label. `[3n]` means: type `3n`. An absolute
+index (`[7]`) names the match and leaves the reader to count the presses
+themselves, which is the arithmetic they wanted done for them. The counting
+follows what the keys really do — `n` lands on the first match after the
+cursor, `N` on the one before it — and it is deliberately NOT counted around
+the end of the file: a match one line above is one `N` away, and reporting it
+as "15 presses of n, the long way round" is true and useless.
+
+                                                       *lvim-search-why-one-lens*
+Several matches on one line would stack labels at the same end-of-line
+position, where only the first is readable. So each line carries ONE lens: the
+first match on it, unless the nearest match is on that line, in which case the
+nearest wins the label.
+
+Only lines inside the window are decorated. The match list may hold a hundred
+thousand entries; the cost of a repaint is bounded by the window, not the file.
+
+==============================================================================
+10. HEALTH                                                   *lvim-search-health*
+
+>vim
+    :checkhealth lvim-search
+<
+Reports the environment, the live state, every configurable format and glyph,
+and whether the accents name real palette colours. The check worth knowing
+about: with 'hlsearch' off, every part of the plugin works and nothing is ever
+shown — that is reported as an error, not a note.
+
+vim:tw=78:ts=8:ft=help:norl:
