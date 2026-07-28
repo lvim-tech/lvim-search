@@ -133,9 +133,20 @@ local M = {
     -- rows would label them, which is noise nobody asked for. `nofile` is NOT here: many perfectly
     -- searchable buffers (a scratch, a preview) carry it, and a plugin panel that does not want
     -- lenses can name its own filetype below.
+    -- THE BLACKLIST. A search is a fact about the DOCUMENT, and the set's own chrome is not one:
+    -- the cmdline zone, a picker, a completion menu and a framed panel all hold text that happens
+    -- to contain the pattern, and painting a match there marks something the reader cannot jump to
+    -- (reported from a screenshot: the typed `:LvimForg` lit up inside the command line). Both
+    -- lists are plain config — a surface this plugin has never heard of is one line to exclude.
     ignore = {
         buftype = { "terminal", "prompt", "quickfix" },
-        filetype = {},
+        filetype = {
+            -- lvim-ui: the framed container / hide-cursor panels, the generic surface buffer, and
+            -- the completion menu float.
+            "lvim-ui-frame",
+            "lvim-utils-ui",
+            "lvim-ui-menu",
+        },
     },
     -- What the viewport hides is exactly what the reader cannot judge for themselves — so the
     -- nearest lens carries it. NOT the sign column: a sign belongs to a LINE and is drawn on that

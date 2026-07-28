@@ -110,8 +110,14 @@ Then: >lua
     repaints immediately; only the storm behind it is thinned.
 
 `ignore.buftype`   string[], default `{ "terminal", "prompt", "quickfix" }`
-`ignore.filetype`                                    string[], default `{}`
-    Buffers that are never decorated.
+`ignore.filetype`  string[], default `{ "lvim-ui-frame", "lvim-utils-ui",
+                   "lvim-ui-menu" }`
+    Buffers that are never decorated — the blacklist. A search is a fact about
+    the DOCUMENT, and the editor's own chrome is not one: the cmdline zone, a
+    picker, a completion menu and a framed panel all hold text that may contain
+    the pattern, and a match painted there marks something the reader cannot
+    jump to. The defaults cover this set's own surfaces; a surface the plugin
+    has never heard of is one line to add.
 
 ------------------------------------------------------------------------------
 4.2 SCANNING                                           *lvim-search-config-scan*

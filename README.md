@@ -148,10 +148,12 @@ require("lvim-search").setup({
         budget = 50,
     },
 
-    -- Buffers that are never decorated.
+    -- Buffers that are never decorated. A search is a fact about the DOCUMENT; the editor's own
+    -- chrome (the cmdline zone, a picker, a completion menu, a framed panel) holds text that may
+    -- contain the pattern but nothing the reader can jump to.
     ignore = {
         buftype = { "terminal", "prompt", "quickfix" },
-        filetype = {},
+        filetype = { "lvim-ui-frame", "lvim-utils-ui", "lvim-ui-menu" },
     },
 
     scan = {

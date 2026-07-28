@@ -504,10 +504,17 @@ local function attach()
     -- preview of the partial pattern — not to the one our counters describe. Leaving the old lenses
     -- up would label the wrong matches, so they come down for the duration and the state is rebuilt
     -- from whatever the user actually commits to.
+    -- THE TYPE IS CHECKED IN THE CALLBACK, not left to the pattern. A cmdline event's `pattern` is
+    -- glob-matched against the cmdline TYPE, and `?` is the single-character wildcard there — so
+    -- `{ "/", "?" }` matched EVERY type, `:` included, and the plugin counted the text of an
+    -- ordinary command as if it were a search (measured: typing `:Lvim` previewed "Lvim" and put
+    -- 1/545 on screen).
     api.nvim_create_autocmd("CmdlineEnter", {
         group = group,
-        pattern = { "/", "?" },
         callback = function(ev)
+            if fn.getcmdtype() ~= "/" and fn.getcmdtype() ~= "?" then
+                return
+            end
             local pos = api.nvim_win_get_cursor(0)
             preview_origin = { lnum = pos[1], col = pos[2], forward = ev.match ~= "?" }
             preview_floor = 0
@@ -521,8 +528,11 @@ local function attach()
     -- command line itself is exactly the pattern the user means, so it is read directly.
     api.nvim_create_autocmd("CmdlineChanged", {
         group = group,
-        pattern = { "/", "?" },
         callback = function()
+            local t = fn.getcmdtype()
+            if t ~= "/" and t ~= "?" then
+                return
+            end
             if config.preview.enabled then
                 M.preview(fn.getcmdline())
             end
@@ -533,8 +543,13 @@ local function attach()
     -- has executed and `@/` holds the new pattern.
     api.nvim_create_autocmd("CmdlineLeave", {
         group = group,
-        pattern = { "/", "?", ":" },
         callback = function()
+            local t = fn.getcmdtype()
+            -- `:` belongs here and only here: a command can PERFORM a search (`:g/…`, `:s/…`), so
+            -- the committed state is re-read after it runs.
+            if t ~= "/" and t ~= "?" and t ~= ":" then
+                return
+            end
             preview_origin = nil
             vim.schedule(function()
                 -- The sensor is deliberately blind while a cmdline is open, so this is where the
