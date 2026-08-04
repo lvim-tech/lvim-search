@@ -269,12 +269,15 @@ function M.render(win, buf, list, near)
                 if chunks and #chunks > 0 then
                     -- Every lens, not just the nearest: an `eol` lens that runs past the window
                     -- edge is not clipped to something partial, it disappears entirely (measured).
+                    ---@type "eol"|"right_align"|"eol_right_align"
                     local pos = "eol"
                     if not fits(win, buf, m.lnum, width_of(chunks)) then
-                        if config.lens.overflow == "hide" then
+                        local overflow = config.lens.overflow
+                        if overflow == "hide" then
                             chunks = nil
                         else
-                            pos = config.lens.overflow
+                            ---@cast overflow "right_align"|"eol_right_align"
+                            pos = overflow
                         end
                     end
                     if chunks then

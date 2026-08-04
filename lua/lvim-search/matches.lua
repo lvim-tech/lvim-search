@@ -106,6 +106,9 @@ local function scan_fast(buf, pattern, cap)
     if not ok or type(raw) ~= "table" then
         return nil, false
     end
+    -- `matchbufline` answers one dict per match — see `:help matchbufline()`; the vim.fn signature
+    -- does not carry that shape.
+    ---@cast raw { lnum: integer, byteidx: integer, text: string }[]
     local out, capped = {}, false
     for _, m in ipairs(raw) do
         if #out >= cap then
