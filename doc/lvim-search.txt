@@ -59,7 +59,7 @@ question the command does not.
 ==============================================================================
 2. REQUIREMENTS                                        *lvim-search-requirements*
 
-    • Neovim 0.10 or newer (|matchbufline()|, decoration providers)
+    • Neovim 0.12 or newer (|matchbufline()|, decoration providers)
     • lvim-utils
     • 'hlsearch' must be on. Without it |v:hlsearch| never becomes 1 and
       nothing is ever shown; |:checkhealth| reports this as an error.

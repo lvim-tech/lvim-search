@@ -75,10 +75,10 @@ function M.check()
     health.start("lvim-search")
 
     -- ── the environment ─────────────────────────────────────────────────────
-    if fn.has("nvim-0.10") == 1 then
+    if fn.has("nvim-0.12") == 1 then
         health.ok("Neovim " .. tostring(vim.version()))
     else
-        health.error("Neovim 0.10 or newer is required (matchbufline, decoration providers)")
+        health.error("Neovim >= 0.12 is required (the lvim-tech set targets 0.12; lvim-utils requires it)")
     end
 
     if fn.exists("*matchbufline") == 1 then

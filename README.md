@@ -55,7 +55,7 @@ each way — ` 3` behind the cursor, ` 1` ahead, joined by `•`.
 
 ## Requirements
 
-- Neovim 0.10 or newer (`matchbufline()`, decoration providers)
+- Neovim 0.12 or newer (`matchbufline()`, decoration providers)
 - `lvim-utils`
 - `'hlsearch'` on — without it `v:hlsearch` never becomes 1 and nothing appears; `:checkhealth
   lvim-search` says so in as many words.
