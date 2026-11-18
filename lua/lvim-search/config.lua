@@ -173,7 +173,7 @@ local M = {
         -- BETWEEN the two counts, when both are shown. Its own option because the wrap cannot do
         -- this job: padding on the outside of each side would meet at the junction and put the two
         -- values twice as far apart as either edge. A bullet (U+2022, verified one cell) — the
-        -- set-wide ➤ separator is a POINTER, and these two counts point opposite ways.
+        -- set-wide 󰅂 separator is a POINTER, and these two counts point opposite ways.
         sep = " • ",
     },
     -- While a search is being typed, the plugin deliberately ignores `v:hlsearch` — 'incsearch'
@@ -224,12 +224,12 @@ local M = {
         priority = 20,
     },
     counter = { publish = true },
-    -- `➤` per the separator canon.
+    -- `󰅂` per the separator canon.
     qf = {
-        title = "Search ➤ {pattern}",
+        title = "Search 󰅂 {pattern}",
         -- A sweep across buffers says how many it actually read, so a short list is never mistaken
         -- for "that is all there is".
-        title_scoped = "Search ➤ {pattern} ({buffers} buffers)",
+        title_scoped = "Search 󰅂 {pattern} ({buffers} buffers)",
     },
     on_list = nil,
     highlights = {

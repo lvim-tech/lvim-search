@@ -221,9 +221,9 @@ require("lvim-search").setup({
 
     qf = {
         -- Title of the exported list: {pattern}.
-        title = "Search ➤ {pattern}",
+        title = "Search 󰅂 {pattern}",
         -- …and when the export swept several buffers: {pattern}, {buffers}.
-        title_scoped = "Search ➤ {pattern} ({buffers} buffers)",
+        title_scoped = "Search 󰅂 {pattern} ({buffers} buffers)",
     },
 
     -- Where an export goes instead of the quickfix list. Same shape Neovim's own LSP handlers use:

@@ -257,10 +257,10 @@ line waits for input. Nothing wrong is shown; the preview simply waits.
 ------------------------------------------------------------------------------
 4.5 EXPORT                                           *lvim-search-config-export*
 
-`qf.title`                             string, default `"Search ➤ {pattern}"`
+`qf.title`                             string, default `"Search 󰅂 {pattern}"`
     Title of the exported list.
 
-`qf.title_scoped`      string, default `"Search ➤ {pattern} ({buffers} buffers)"`
+`qf.title_scoped`      string, default `"Search 󰅂 {pattern} ({buffers} buffers)"`
     …and when the export swept several buffers.
     A sweep says how many it actually read, so a short list is never mistaken
     for "that is all there is".
