@@ -174,7 +174,7 @@ local M = {
         -- this job: padding on the outside of each side would meet at the junction and put the two
         -- values twice as far apart as either edge. A bullet (U+2022, verified one cell) — the
         -- set-wide 󰅂 separator is a POINTER, and these two counts point opposite ways.
-        sep = " • ",
+        sep = " \u{f09df} ",
     },
     -- While a search is being typed, the plugin deliberately ignores `v:hlsearch` — 'incsearch'
     -- toggles it per keystroke and swaps `@/` to the partial pattern, so it says nothing true. The

@@ -74,6 +74,63 @@ local function indicator_for(steps, forward)
     })
 end
 
+--- The built-in lens chunks with their ICON glyphs (the indicator arrows, the remaining-count angles) as
+--- lvim-icons images where UI icons are images ("material"). A glyph is cut out of its chunk into a chunk of
+--- its own: an image's fg IS its image id, so it cannot share the lens group's fg — it takes the lens
+--- group's background instead (`on_bg`). Anything else (another mode, no glyph) returns `chunks` unchanged.
+---@param chunks table[]
+---@return table[]
+local function with_images(chunks)
+    local ok, iconlib = pcall(require, "lvim-utils.icons")
+    if not (ok and iconlib.ui_text) then
+        return chunks
+    end
+    local glyphs = {}
+    for _, g in ipairs({
+        config.lens.indicator.up,
+        config.lens.indicator.down,
+        config.remaining.above,
+        config.remaining.below,
+    }) do
+        g = vim.trim(g or "")
+        if g ~= "" and fn.strchars(g) == 1 then
+            glyphs[g] = true
+        end
+    end
+    if next(glyphs) == nil then
+        return chunks
+    end
+    local out, changed = {}, false
+    for _, chunk in ipairs(chunks) do
+        local text, group = chunk[1], chunk[2]
+        local pending = ""
+        local split = false
+        for ch in text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+            local t, h, img = nil, nil, false
+            if glyphs[ch] then
+                t, h, img = iconlib.ui_text(ch, group)
+            end
+            if img then
+                if pending ~= "" then
+                    out[#out + 1] = { pending, group }
+                    pending = ""
+                end
+                out[#out + 1] = { t, iconlib.on_bg({ image = true, hl = h }, group) or h }
+                split = true
+            else
+                pending = pending .. ch
+            end
+        end
+        if not split then
+            out[#out + 1] = chunk
+        elseif pending ~= "" then
+            out[#out + 1] = { pending, group }
+        end
+        changed = changed or split
+    end
+    return changed and out or chunks
+end
+
 --- The lens body for one match, as extmark chunks.
 ---
 --- `lens.format` is asked first and its answer is final — that is the whole extension point, and a
@@ -137,7 +194,7 @@ local function chunks_for(ctx)
             chunks[#chunks + 1] = { text, "LvimSearchRemaining" }
         end
     end
-    return chunks
+    return with_images(chunks)
 end
 
 --- How wide the chunks are, in display cells.

@@ -131,7 +131,7 @@ require("lvim-search").setup({
         wrap = { left = " ", right = " " },
         -- BETWEEN the two counts. Its own option because the wrap cannot express it: padding on the
         -- outside of each side would meet at the junction and double.
-        sep = " • ",
+        sep = " 󰧟 ",
     },
 
     -- Count the pattern WHILE it is being typed, before <CR>.
@@ -315,6 +315,14 @@ theme.
 
 Reports the environment, the live state, every configurable format and glyph, and whether the
 accents name real palette colours.
+
+## Icons
+
+Every icon this plugin draws is a Nerd Font glyph. When [lvim-icons](https://github.com/lvim-tech/lvim-icons)
+runs in `mode = "material"` and the terminal shows kitty unicode placeholders, the plugin's own UI glyphs are
+drawn as images of those same glyphs, in their own colours and with their columns kept; in `nerd` and `mix`
+they stay text. There is nothing to set here: the mode is lvim-icons' (`lvim-utils.icons.ui_text` does the
+work).
 
 ## License
 

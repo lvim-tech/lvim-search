@@ -345,7 +345,7 @@ background. >lua
 `remaining.wrap`                   table, default `{ left = " ", right = " " }`
     Around the PAIR, exactly like `lens.wrap`; both `""` for bare text.
 
-`remaining.sep`                                       string, default `" • "`
+`remaining.sep`                                       string, default `" 󰧟 "`
     BETWEEN the two counts, when both are shown. Its own option because the
     wrap cannot express it: applied per side, the first side's right padding
     would meet the second's left padding and the two values would sit twice as
